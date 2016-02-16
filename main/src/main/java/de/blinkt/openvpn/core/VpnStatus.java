@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Arne Schwabe
+ * Copyright (c) 2012-2016 Arne Schwabe
  * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
  */
 
@@ -12,6 +12,8 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.Signature;
 import android.os.Build;
+import android.os.HandlerThread;
+import android.os.Message;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
@@ -73,10 +75,12 @@ public class VpnStatus {
 
     private static final int MAXLOGENTRIES = 1000;
 
-    public static String getCleanLogMessage(ConnectionStatus level, String logMessage) {
-        switch (level) {
+
+    public static String getLastCleanLogMessage(Context c) {
+        String message = mLaststatemsg;
+        switch (mLastLevel) {
             case LEVEL_CONNECTED:
-                String[] parts = logMessage.split(",");
+                String[] parts = mLaststatemsg.split(",");
                 /*
                    (a) the integer unix date/time,
                    (b) the state name,
@@ -90,14 +94,37 @@ public class VpnStatus {
                    5 (h) optional local port, and
                    6 (i) optional TUN/TAP local IPv6 address.
 */
-                    // Return only the assigned IP addresses in the UI
-                if (parts.length < 7)
-                    return logMessage;
-                return String.format(Locale.US, "%s %s", parts[1], parts[6]);
-            default:
-                return logMessage;
+                // Return only the assigned IP addresses in the UI
+                if (parts.length >= 7)
+                    message = String.format(Locale.US, "%s %s", parts[1], parts[6]);
+                break;
         }
 
+        while (message.endsWith(","))
+            message = message.substring(0, message.length() - 1);
+
+        String status = mLaststate;
+        if (status.equals("NOPROCESS"))
+            return message;
+
+        String prefix = c.getString(mLastStateresid);
+        if (mLastStateresid == R.string.unknown_state)
+            message = status + message;
+        if (message.length() > 0)
+            prefix += ": ";
+
+        return prefix + message;
+
+    }
+
+    public static void initLogCache(File cacheDir) {
+        Message m = mLogFileHandler.obtainMessage(LogFileHandler.LOG_INIT, cacheDir);
+        mLogFileHandler.sendMessage(m);
+
+    }
+
+    public static void flushLog() {
+        mLogFileHandler.sendEmptyMessage(LogFileHandler.FLUSH_TO_DISK);
     }
 
     public enum ConnectionStatus {
@@ -107,6 +134,7 @@ public class VpnStatus {
         LEVEL_CONNECTING_NO_SERVER_REPLY_YET,
         LEVEL_NONETWORK,
         LEVEL_NOTCONNECTED,
+        LEVEL_START,
         LEVEL_AUTH_FAILED,
         LEVEL_WAITING_FOR_USER_INPUT,
         UNKNOWN_LEVEL
@@ -154,18 +182,24 @@ public class VpnStatus {
 
     private static ConnectionStatus mLastLevel = ConnectionStatus.LEVEL_NOTCONNECTED;
 
+    private static final LogFileHandler mLogFileHandler;
+
     static {
         logbuffer = new LinkedList<>();
         logListener = new Vector<>();
         stateListener = new Vector<>();
         byteCountListener = new Vector<>();
+
+        HandlerThread mHandlerThread = new HandlerThread("LogFileWriter", Thread.MIN_PRIORITY);
+        mHandlerThread.start();
+        mLogFileHandler = new LogFileHandler(mHandlerThread.getLooper());
+
         logInformation();
+
     }
 
 
     public static class LogItem implements Parcelable {
-
-
         private Object[] mArgs = null;
         private String mMessage = null;
         private int mRessourceId;
@@ -337,11 +371,6 @@ public class VpnStatus {
         }
     }
 
-    public void saveLogToDisk(Context c) {
-
-        File logOut = new File(c.getCacheDir(), "log.xml");
-    }
-
     public interface LogListener {
         void newLog(LogItem logItem);
     }
@@ -362,6 +391,7 @@ public class VpnStatus {
     public synchronized static void clearLog() {
         logbuffer.clear();
         logInformation();
+        mLogFileHandler.sendEmptyMessage(LogFileHandler.TRIM_LOG_FILE);
     }
 
     private static void logInformation() {
@@ -396,32 +426,34 @@ public class VpnStatus {
     }
 
     private static int getLocalizedState(String state) {
-        if (state.equals("CONNECTING"))
-            return R.string.state_connecting;
-        else if (state.equals("WAIT"))
-            return R.string.state_wait;
-        else if (state.equals("AUTH"))
-            return R.string.state_auth;
-        else if (state.equals("GET_CONFIG"))
-            return R.string.state_get_config;
-        else if (state.equals("ASSIGN_IP"))
-            return R.string.state_assign_ip;
-        else if (state.equals("ADD_ROUTES"))
-            return R.string.state_add_routes;
-        else if (state.equals("CONNECTED"))
-            return R.string.state_connected;
-        else if (state.equals("DISCONNECTED"))
-            return R.string.state_disconnected;
-        else if (state.equals("RECONNECTING"))
-            return R.string.state_reconnecting;
-        else if (state.equals("EXITING"))
-            return R.string.state_exiting;
-        else if (state.equals("RESOLVE"))
-            return R.string.state_resolve;
-        else if (state.equals("TCP_CONNECT"))
-            return R.string.state_tcp_connect;
-        else
-            return R.string.unknown_state;
+        switch (state) {
+            case "CONNECTING":
+                return R.string.state_connecting;
+            case "WAIT":
+                return R.string.state_wait;
+            case "AUTH":
+                return R.string.state_auth;
+            case "GET_CONFIG":
+                return R.string.state_get_config;
+            case "ASSIGN_IP":
+                return R.string.state_assign_ip;
+            case "ADD_ROUTES":
+                return R.string.state_add_routes;
+            case "CONNECTED":
+                return R.string.state_connected;
+            case "DISCONNECTED":
+                return R.string.state_disconnected;
+            case "RECONNECTING":
+                return R.string.state_reconnecting;
+            case "EXITING":
+                return R.string.state_exiting;
+            case "RESOLVE":
+                return R.string.state_resolve;
+            case "TCP_CONNECT":
+                return R.string.state_tcp_connect;
+            default:
+                return R.string.unknown_state;
+        }
 
     }
 
@@ -523,16 +555,32 @@ public class VpnStatus {
         newLogItem(new LogItem(LogLevel.DEBUG, resourceId, args));
     }
 
+    private static void newLogItem(LogItem logItem) {
+        newLogItem(logItem, false);
+    }
 
-    private synchronized static void newLogItem(LogItem logItem) {
-        logbuffer.addLast(logItem);
-        if (logbuffer.size() > MAXLOGENTRIES)
-            logbuffer.removeFirst();
+
+    synchronized static void newLogItem(LogItem logItem, boolean cachedLine) {
+        if (cachedLine) {
+            logbuffer.addFirst(logItem);
+        } else {
+            logbuffer.addLast(logItem);
+            Message m = mLogFileHandler.obtainMessage(LogFileHandler.LOG_MESSAGE, logItem);
+            mLogFileHandler.sendMessage(m);
+        }
+
+        if (logbuffer.size() > MAXLOGENTRIES + MAXLOGENTRIES / 2) {
+            while (logbuffer.size() > MAXLOGENTRIES)
+                logbuffer.removeFirst();
+            mLogFileHandler.sendMessage(mLogFileHandler.obtainMessage(LogFileHandler.TRIM_LOG_FILE));
+        }
+
 
         for (LogListener ll : logListener) {
             ll.newLog(logItem);
         }
     }
+
 
     public static void logError(String msg) {
         newLogItem(new LogItem(LogLevel.ERROR, msg));

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Arne Schwabe
+ * Copyright (c) 2012-2016 Arne Schwabe
  * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
  */
 
@@ -84,7 +84,7 @@ public class ShowConfigFragment extends Fragment {
 		shareIntent.putExtra(Intent.EXTRA_TEXT, configtext);
 		shareIntent.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.export_config_title));
 		shareIntent.setType("text/plain");
-		startActivity(Intent.createChooser(shareIntent, "Export Configfile"));
+		startActivity(Intent.createChooser(shareIntent, getString(R.string.export_config_chooser_title)));
 	}
 
 	@Override

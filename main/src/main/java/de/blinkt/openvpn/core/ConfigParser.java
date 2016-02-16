@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Arne Schwabe
+ * Copyright (c) 2012-2016 Arne Schwabe
  * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
  */
 
@@ -399,6 +399,10 @@ public class ConfigParser {
             np.mCustomRoutesv6 = customIPv6Routes;
         }
 
+        Vector<String> routeNoPull = getOption("route-nopull", 1, 1);
+        if (routeNoPull!=null)
+            np.mRoutenopull=true;
+
         // Also recognize tls-auth [inline] direction ...
         Vector<Vector<String>> tlsauthoptions = getAllOption("tls-auth", 1, 2);
         if (tlsauthoptions != null) {
@@ -577,6 +581,9 @@ public class ConfigParser {
 
         if (getOption("persist-tun", 0, 0) != null)
             np.mPersistTun = true;
+
+        if (getOption("push-peer-info", 0, 0) != null)
+            np.mPushPeerInfo = true;
 
         Vector<String> connectretry = getOption("connect-retry", 1, 1);
         if (connectretry != null)

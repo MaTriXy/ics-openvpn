@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <!--
-  ~ Copyright (c) 2012-2014 Arne Schwabe
+  ~ Copyright (c) 2012-2016 Arne Schwabe
   ~ Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
   -->
 
@@ -17,7 +17,12 @@
 
     <!-- <uses-permission android:name="com.android.vending.BILLING" /> -->
 
-    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
 
     <application
         android:name=".core.ICSOpenVPNApplication"
@@ -33,10 +38,11 @@
             android:windowSoftInputMode="stateHidden" />
 
         <activity
+            android:name=".activities.DisconnectVPN"
             android:autoRemoveFromRecents="true"
             android:excludeFromRecents="true"
-            android:name=".activities.DisconnectVPN"
-            android:theme="@android:style/Theme.DeviceDefault.Light.Dialog" />
+            android:taskAffinity=""
+            android:theme="@style/blinkt.dialog" />
 
         <activity
             android:name=".activities.LogWindow"
@@ -49,6 +55,7 @@
             tools:ignore="ExportedActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -64,9 +71,9 @@
         </service>
 
         <service
-            tools:ignore="ExportedService"
-            android:name=".api.ExternalOpenVPNService">
-          
+            android:name=".api.ExternalOpenVPNService"
+            tools:ignore="ExportedService">
+
             <intent-filter>
                 <action android:name="de.blinkt.openvpn.api.IOpenVPNAPIService" />
             </intent-filter>
@@ -134,7 +141,7 @@
             android:name=".LaunchVPN"
             android:excludeFromRecents="true"
             android:label="@string/vpn_launch_title"
-            android:theme="@android:style/Theme.DeviceDefault.Light.Panel"
+            android:theme="@style/blinkt.dialog"
             tools:ignore="ExportedActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

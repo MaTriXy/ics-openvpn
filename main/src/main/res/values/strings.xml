@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?> <!--
-  ~ Copyright (c) 2012-2014 Arne Schwabe
+  ~ Copyright (c) 2012-2016 Arne Schwabe
   ~ Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
   -->
 <resources>
@@ -385,7 +385,7 @@
     <string name="lastdumpdate">(Last dump is %1$d:%2$dh old (%3$s))</string>
     <string name="clear_log_on_connect">Clear log on new connection</string>
     <string name="connect_timeout">Connect Timeout</string>
-    <string name="no_allowed_app">No allowed app added. Addding ourselves (%s) to have at least one app in the allowed app list to not allow all apps</string>
+    <string name="no_allowed_app">No allowed app added. Adding ourselves (%s) to have at least one app in the allowed app list to not allow all apps</string>
     <string name="query_permissions_sdcard">OpenVPN for Android can try to discover the missing file(s) on the sdcard automatically. Tap this message start the permission request.</string>
     <string name="protocol">Protocol</string>
     <string name="enabled_connection_entry">Enabled</string>
@@ -394,5 +394,10 @@
     <string name="days_left">%d days left</string>
     <string name="hours_left">%d hours left</string>
     <string name="permission_revoked">VPN permission revoked by OS (e.g. other VPN program started), stopping VPN</string>
-
+    <string name="pushpeerinfo">Push Peer info</string>
+    <string name="pushpeerinfosummary">Send extra information to the server, e.g. SSL version and Android version</string>
+    <string name="pw_request_dialog_title">Need %1$s</string>
+    <string name="pw_request_dialog_prompt">Please enter the password for profile %1$s</string>
+    <string name="menu_use_inline_data">Use inline data</string>
+    <string name="export_config_chooser_title">Export configuration file</string>
 </resources>

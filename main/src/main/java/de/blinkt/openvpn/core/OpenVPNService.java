@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Arne Schwabe
+ * Copyright (c) 2012-2016 Arne Schwabe
  * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
  */
 
@@ -10,15 +10,18 @@ import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.UiModeManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.net.ConnectivityManager;
 import android.net.VpnService;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Handler;
 import android.os.Handler.Callback;
 import android.os.IBinder;
 import android.os.Message;
@@ -27,6 +30,7 @@ import android.preference.PreferenceManager;
 import android.system.OsConstants;
 import android.text.TextUtils;
 import android.util.Log;
+import android.widget.Toast;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -80,6 +84,8 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
     private String mLastTunCfg;
     private String mRemoteGW;
     private final Object mProcessLock = new Object();
+    private Handler guiHandler;
+    private Toast mlastToast;
 
     // From: http://stackoverflow.com/questions/3758606/how-to-convert-byte-size-into-human-readable-format-in-java
     public static String humanReadableByteCount(long bytes, boolean mbit) {
@@ -135,7 +141,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         }
     }
 
-    private void showNotification(String msg, String tickerText, boolean lowpriority, long when, ConnectionStatus status) {
+    private void showNotification(final String msg, String tickerText, boolean lowpriority, long when, ConnectionStatus status) {
         String ns = Context.NOTIFICATION_SERVICE;
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(ns);
 
@@ -164,6 +170,9 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN)
             jbNotificationExtras(lowpriority, nbuilder);
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            lpNotificationExtras(nbuilder);
+
         if (tickerText != null && !tickerText.equals(""))
             nbuilder.setTicker(tickerText);
 
@@ -173,6 +182,33 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
         mNotificationManager.notify(OPENVPN_STATUS, notification);
         startForeground(OPENVPN_STATUS, notification);
+
+        // Check if running on a TV
+        if(runningOnAndroidTV() && !lowpriority)
+            guiHandler.post(new Runnable() {
+
+                @Override
+                public void run() {
+
+                    if (mlastToast!=null)
+                        mlastToast.cancel();
+                    String toastText = String.format(Locale.getDefault(), "%s - %s", mProfile.mName, msg);
+                    mlastToast = Toast.makeText(getBaseContext(), toastText, Toast.LENGTH_SHORT);
+                    mlastToast.show();
+                }
+            });
+    }
+
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    private void lpNotificationExtras(Notification.Builder nbuilder) {
+        nbuilder.setCategory(Notification.CATEGORY_SERVICE);
+        nbuilder.setLocalOnly(true);
+
+    }
+
+    private boolean runningOnAndroidTV() {
+        UiModeManager uiModeManager = (UiModeManager) getSystemService(UI_MODE_SERVICE);
+        return uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
     }
 
     private int getIconByConnectionStatus(ConnectionStatus level) {
@@ -215,20 +251,20 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             disconnectVPN.setAction(DISCONNECT_VPN);
             PendingIntent disconnectPendingIntent = PendingIntent.getActivity(this, 0, disconnectVPN, 0);
 
-            nbuilder.addAction(android.R.drawable.ic_menu_close_clear_cancel,
+            nbuilder.addAction(R.drawable.ic_menu_close_clear_cancel,
                     getString(R.string.cancel_connection), disconnectPendingIntent);
 
             Intent pauseVPN = new Intent(this, OpenVPNService.class);
             if (mDeviceStateReceiver == null || !mDeviceStateReceiver.isUserPaused()) {
                 pauseVPN.setAction(PAUSE_VPN);
                 PendingIntent pauseVPNPending = PendingIntent.getService(this, 0, pauseVPN, 0);
-                nbuilder.addAction(android.R.drawable.ic_media_pause,
+                nbuilder.addAction(R.drawable.ic_menu_pause,
                         getString(R.string.pauseVPN), pauseVPNPending);
 
             } else {
                 pauseVPN.setAction(RESUME_VPN);
                 PendingIntent resumeVPNPending = PendingIntent.getService(this, 0, pauseVPN, 0);
-                nbuilder.addAction(android.R.drawable.ic_media_play,
+                nbuilder.addAction(R.drawable.ic_menu_play,
                         getString(R.string.resumevpn), resumeVPNPending);
             }
 
@@ -296,6 +332,9 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
 
         VpnStatus.addStateListener(this);
         VpnStatus.addByteCountListener(this);
+
+        guiHandler = new Handler(getMainLooper());
+
 
         if (intent != null && PAUSE_VPN.equals(intent.getAction())) {
             if (mDeviceStateReceiver != null)
@@ -454,6 +493,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         }
         // Just in case unregister for state
         VpnStatus.removeStateListener(this);
+        VpnStatus.flushLog();
 
     }
 
@@ -536,6 +576,26 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
         Collection<ipAddress> positiveIPv4Routes = mRoutes.getPositiveIPList();
         Collection<ipAddress> positiveIPv6Routes = mRoutesv6.getPositiveIPList();
 
+        if ("samsung".equals(Build.BRAND) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && mDnslist.size() >= 1) {
+            // Check if the first DNS Server is in the VPN range
+            try {
+                ipAddress dnsServer = new ipAddress(new CIDRIP(mDnslist.get(0), 32), true);
+                boolean dnsIncluded=false;
+                for (ipAddress net : positiveIPv4Routes) {
+                    if (net.containsNet(dnsServer)) {
+                        dnsIncluded = true;
+                    }
+                }
+                if (!dnsIncluded) {
+                    String samsungwarning = String.format("Warning Samsung Android 5.0+ devices ignore DNS servers outside the VPN range. To enable DNS resolution a route to your DNS Server (%s) has been added.", mDnslist.get(0));
+                    VpnStatus.logWarning(samsungwarning);
+                    positiveIPv4Routes.add(dnsServer);
+                }
+            } catch (Exception e) {
+                VpnStatus.logError("Error parsing DNS Server IP: " + mDnslist.get(0));
+            }
+        }
+
         ipAddress multicastRange = new ipAddress(new CIDRIP("224.0.0.0", 3), true);
 
         for (NetworkSpace.ipAddress route : positiveIPv4Routes) {
@@ -558,24 +618,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             }
         }
 
-        if ("samsung".equals(Build.BRAND) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && mDnslist.size() >= 1) {
-            // Check if the first DNS Server is in the VPN range
-            try {
-                ipAddress dnsServer = new ipAddress(new CIDRIP(mDnslist.get(0), 32), true);
-                boolean dnsIncluded=false;
-                for (ipAddress net : positiveIPv4Routes) {
-                    if (net.containsNet(dnsServer)) {
-                        dnsIncluded = true;
-                    }
-                }
-                if (!dnsIncluded) {
-                    String samsungwarning = String.format("Warning Samsung Android 5.0+ devices ignore DNS servers outside the VPN range. To enable DNS add a custom route to your DNS Server (%s) or change to a DNS inside your VPN range", mDnslist.get(0));
-                    VpnStatus.logWarning(samsungwarning);
-                }
-            } catch (Exception e) {
-                VpnStatus.logError("Error parsing DNS Server IP: " + mDnslist.get(0));
-            }
-        }
+
 
 
         if (mDomain != null)
@@ -850,7 +893,8 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             } else if (level == LEVEL_CONNECTED) {
                 mDisplayBytecount = true;
                 mConnecttime = System.currentTimeMillis();
-                lowpriority = true;
+                if (!runningOnAndroidTV())
+                    lowpriority = true;
             } else {
                 mDisplayBytecount = false;
             }
@@ -860,7 +904,7 @@ public class OpenVPNService extends VpnService implements StateListener, Callbac
             // CONNECTED
             // Does not work :(
             String msg = getString(resid);
-            showNotification(msg + " " + VpnStatus.getCleanLogMessage(level, logmessage),
+            showNotification(VpnStatus.getLastCleanLogMessage(this),
                     msg, lowpriority, 0, level);
 
         }

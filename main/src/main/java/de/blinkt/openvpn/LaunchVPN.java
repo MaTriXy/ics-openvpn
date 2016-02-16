@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Arne Schwabe
+ * Copyright (c) 2012-2016 Arne Schwabe
  * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
  */
 
@@ -131,8 +131,8 @@ public class LaunchVPN extends Activity {
 		entry.setTransformationMethod(new PasswordTransformationMethod());
 
 		AlertDialog.Builder dialog = new AlertDialog.Builder(this);
-		dialog.setTitle("Need " + getString(type));
-		dialog.setMessage("Enter the password for profile " + mSelectedProfile.mName);
+		dialog.setTitle(getString(R.string.pw_request_dialog_title, getString(type)));
+		dialog.setMessage(getString(R.string.pw_request_dialog_prompt, mSelectedProfile.mName));
 
         if (type == R.string.password) {
             ((EditText)userpwlayout.findViewById(R.id.username)).setText(mSelectedProfile.mUsername);

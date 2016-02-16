@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Arne Schwabe
+ * Copyright (c) 2012-2016 Arne Schwabe
  * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
  */
 
@@ -650,20 +650,15 @@ public class LogFragment extends ListFragment implements StateListener, SeekBar.
     @Override
     public void updateState(final String status, final String logMessage, final int resId, final ConnectionStatus level) {
         if (isAdded()) {
-            final String cleanLogMessage = VpnStatus.getCleanLogMessage(level, logMessage);
+            final String cleanLogMessage = VpnStatus.getLastCleanLogMessage(getActivity());
 
             getActivity().runOnUiThread(new Runnable() {
 
                 @Override
                 public void run() {
                     if (isAdded()) {
-                        String prefix = getString(resId) + ":";
-                        if (status.equals("BYTECOUNT") || status.equals("NOPROCESS"))
-                            prefix = "";
-                        if (resId == R.string.unknown_state)
-                            prefix += status;
                         if (mSpeedView != null) {
-                            mSpeedView.setText(prefix + cleanLogMessage);
+                            mSpeedView.setText(cleanLogMessage);
                         }
                         if (mConnectStatus != null)
                             mConnectStatus.setText(getString(resId));

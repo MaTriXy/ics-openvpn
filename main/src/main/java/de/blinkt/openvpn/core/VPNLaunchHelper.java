@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Arne Schwabe
+ * Copyright (c) 2012-2016 Arne Schwabe
  * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
  */
 
@@ -126,12 +126,13 @@ public class VPNLaunchHelper {
 	
 
 	public static void startOpenVpn(VpnProfile startprofile, Context context) {
-		if(writeMiniVPN(context)==null) {
+        VpnStatus.logInfo(R.string.building_configration);
+        VpnStatus.updateStateString("VPN_GENERATE_CONFIG", "", R.string.building_configration, VpnStatus.ConnectionStatus.LEVEL_START);
+        if(writeMiniVPN(context)==null) {
 			VpnStatus.logError("Error writing minivpn binary");
 			return;
 		}
 
-		VpnStatus.logInfo(R.string.building_configration);
 
 		Intent startVPN = startprofile.prepareStartService(context);
 		if(startVPN!=null)
