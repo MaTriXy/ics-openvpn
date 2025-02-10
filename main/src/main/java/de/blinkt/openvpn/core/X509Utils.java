@@ -5,6 +5,7 @@
 
 package de.blinkt.openvpn.core;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
 import android.text.TextUtils;
@@ -79,7 +80,7 @@ public class X509Utils {
 			try {
 				X509Certificate cert = (X509Certificate) getCertificatesFromFile(filename)[0];
                 String friendlycn = getCertificateFriendlyName(cert);
-                friendlycn = getCertificateValidityString(cert, c.getResources()) + friendlycn;
+                friendlycn = getCertificateValidityString(cert, c.getResources()) + ", " + friendlycn;
                 return friendlycn;
 
 			} catch (Exception e) {
@@ -106,14 +107,14 @@ public class X509Utils {
         // More than 3 months display months
         if (timeLeft > 90l* 24 * 3600 * 1000) {
             long months = getMonthsDifference(now, certNotAfter);
-            return res.getString(R.string.months_left, months);
+            return res.getQuantityString(R.plurals.months_left, (int) months, months);
         } else if (timeLeft > 72 * 3600 * 1000) {
             long days = timeLeft / (24 * 3600 * 1000);
-            return res.getString(R.string.days_left, days);
+            return res.getQuantityString(R.plurals.days_left, (int) days, days);
         } else {
             long hours = timeLeft / (3600 * 1000);
 
-            return res.getString(R.string.hours_left, hours);
+            return res.getQuantityString(R.plurals.hours_left, (int)hours, hours);
         }
     }
 
@@ -131,7 +132,7 @@ public class X509Utils {
         /* Hack so we do not have to ship a whole Spongy/bouncycastle */
         Exception exp=null;
         try {
-            Class X509NameClass = Class.forName("com.android.org.bouncycastle.asn1.x509.X509Name");
+            @SuppressLint("PrivateApi") Class X509NameClass = Class.forName("com.android.org.bouncycastle.asn1.x509.X509Name");
             Method getInstance = X509NameClass.getMethod("getInstance",Object.class);
 
             Hashtable defaultSymbols = (Hashtable) X509NameClass.getField("DefaultSymbols").get(X509NameClass);
@@ -145,19 +146,15 @@ public class X509Utils {
 
             friendlyName= (String) toString.invoke(subjectName,true,defaultSymbols);
                     
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
             exp =e ;
-        } catch (NoSuchMethodException e) {
-            exp =e;
-        } catch (InvocationTargetException e) {
-            exp =e;
-        } catch (IllegalAccessException e) {
-            exp =e;
-        } catch (NoSuchFieldException e) {
-            exp =e;
+        } catch (InvocationTargetException | NoSuchMethodException e) {
+            /* Ignore this. Modern Android versions do not expose this */
+            exp = null;
         }
-        if (exp!=null)
+        if (exp!=null) {
             VpnStatus.logException("Getting X509 Name from certificate", exp);
+        }
 
         /* Fallback if the reflection method did not work */
         if(friendlyName==null)

@@ -1,174 +1,121 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<!--
-  ~ Copyright (c) 2012-2016 Arne Schwabe
-  ~ Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
-  -->
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="de.blinkt.openvpn">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" /> -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /> 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
-    <!-- <uses-permission android:name="com.android.vending.BILLING" /> -->
+    <!-- Used to show all apps in the allowed Apps selection,
+         this app needs the list the app in the allow/deny apps over the VPN -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+            tools:ignore="QueryAllPackagesPermission" />
 
-    <uses-feature
-        android:name="android.software.leanback"
-        android:required="false" />
-    <uses-feature
-        android:name="android.hardware.touchscreen"
-        android:required="false" />
+<!--    <queries>-->
+<!--        <intent>-->
+<!--            <action android:name="android.intent.action.GET_CONTENT" />-->
+<!--        </intent>-->
+<!--        <intent>-->
+<!--            <action android:name="android.intent.action.ACTION_OPEN_DOCUMENT" />-->
+<!--        </intent>-->
+<!--    </queries>-->
+
 
     <application
         android:name=".core.ICSOpenVPNApplication"
         android:allowBackup="true"
-        android:icon="@drawable/icon"
+        android:appCategory="productivity"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app"
         android:supportsRtl="true"
         android:theme="@style/blinkt"
         tools:ignore="UnusedAttribute">
-        <activity
-            android:name=".activities.VPNPreferences"
-            android:exported="false"
-            android:windowSoftInputMode="stateHidden" />
+        <meta-data
+            android:name="android.content.APP_RESTRICTIONS"
+            android:resource="@xml/app_restrictions" />
 
         <activity
             android:name=".activities.DisconnectVPN"
             android:autoRemoveFromRecents="true"
             android:excludeFromRecents="true"
-            android:taskAffinity=""
+            android:noHistory="true"
+            android:taskAffinity=".DisconnectVPN"
             android:theme="@style/blinkt.dialog" />
 
-        <activity
-            android:name=".activities.LogWindow"
-            android:allowTaskReparenting="true"
-            android:label="@string/openvpn_log"
-            android:launchMode="singleTask" />
-        <activity android:name=".activities.FileSelect" />
-        <activity
-            android:name=".activities.MainActivity"
-            tools:ignore="ExportedActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
 
         <service
             android:name=".core.OpenVPNService"
-            android:permission="android.permission.BIND_VPN_SERVICE">
+            android:exported="true"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse"
+            android:process=":openvpn">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
-        </service>
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="vpn"/>
 
+        </service>
         <service
             android:name=".api.ExternalOpenVPNService"
-            tools:ignore="ExportedService">
-
+            android:process=":openvpn"
+            android:exported="true"
+                tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="de.blinkt.openvpn.api.IOpenVPNAPIService" />
             </intent-filter>
         </service>
+        <service
+            android:name=".core.OpenVPNStatusService"
+            android:exported="false"
+            android:process=":openvpn" />
 
-        <activity android:name=".api.GrantPermissionsActivity">
+        <activity android:name=".api.GrantPermissionsActivity"
+                android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
         </activity>
-        <activity android:name=".api.ConfirmDialog">
+        <activity android:name=".api.ConfirmDialog"
+                android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
         </activity>
 
-        <receiver android:name=".OnBootReceiver">
+        <receiver android:name=".OnBootReceiver"
+                android:exported="true">
             <intent-filter android:priority="999">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-
             </intent-filter>
         </receiver>
 
-        <activity
-            android:name=".activities.ConfigConverter"
-            android:label="Convert Config File"
-            android:uiOptions="splitActionBarWhenNarrow"
-            tools:ignore="ExportedActivity">
-            <intent-filter android:label="@string/import_config">
-                <action android:name="android.intent.action.VIEW" />
+        <service android:name=".core.keepVPNAlive"
+                android:process=":openvpn"
+                android:exported="true"
+                android:permission="android.permission.BIND_JOB_SERVICE"/>
 
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
 
-                <data android:mimeType="application/x-openvpn-profile" />
-            </intent-filter>
-            <intent-filter android:label="@string/import_config">
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:mimeType="application/ovpn" />
-            </intent-filter>
-            <intent-filter android:label="@string/import_config">
-
-                <!-- http://stackoverflow.com/questions/7f030832/associating-certain-file-extension-to-my-android-application/7102838#7102838 -->
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.BROWSABLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:mimeType="*/*" />
-                <data android:scheme="file" />
-                <data android:host="*" />
-                <data android:pathPattern=".*..*..*..*..*.ovpn" />
-                <data android:pathPattern=".*..*..*..*.ovpn" />
-                <data android:pathPattern=".*..*..*.ovpn" />
-                <data android:pathPattern=".*..*.ovpn" />
-                <data android:pathPattern=".*.ovpn" />
-            </intent-filter>
-        </activity>
         <activity
             android:name=".LaunchVPN"
+            android:autoRemoveFromRecents="true"
             android:excludeFromRecents="true"
             android:label="@string/vpn_launch_title"
+            android:taskAffinity=".LaunchVPN"
             android:theme="@style/blinkt.dialog"
-            tools:ignore="ExportedActivity">
+            android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-
-
-        <activity
-            android:name=".activities.CreateShortcuts"
-            android:excludeFromRecents="true"
-            android:label="@string/vpn_shortcut"
-            android:theme="@android:style/Theme.DeviceDefault.Light.DialogWhenLarge">
-            <intent-filter>
-                <action android:name="android.intent.action.CREATE_SHORTCUT" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
-
-        <provider
-            android:name=".FileProvider"
-            android:authorities="de.blinkt.openvpn.FileProvider"
-            android:exported="true"
-            android:grantUriPermissions="true"
-            tools:ignore="ExportedContentProvider" />
-
         <!--
         <receiver android:name="core.GetRestrictionReceiver">
             <intent-filter>
@@ -176,6 +123,32 @@
             </intent-filter>
         </receiver>
         -->
+        <activity android:name=".api.RemoteAction"
+                android:launchMode="singleInstance"
+                android:autoRemoveFromRecents="true"
+                android:excludeFromRecents="true"
+                android:taskAffinity=".LaunchVPN"
+                android:theme="@style/blinkt.dialog"
+                android:noHistory="true"
+                />
+
+        <activity-alias
+            android:name=".api.ConnectVPN"
+            android:exported="true"
+            android:targetActivity=".api.RemoteAction" />
+        <activity-alias
+            android:name=".api.DisconnectVPN"
+            android:exported="true"
+            android:targetActivity=".api.RemoteAction" />
+        <activity-alias
+                android:name=".api.PauseVPN"
+                android:exported="true"
+                android:targetActivity=".api.RemoteAction" />
+        <activity-alias
+                android:name=".api.ResumeVPN"
+                android:exported="true"
+                android:targetActivity=".api.RemoteAction" />
+
     </application>
 
 </manifest>

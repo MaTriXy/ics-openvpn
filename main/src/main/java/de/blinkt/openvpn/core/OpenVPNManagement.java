@@ -13,18 +13,28 @@ public interface OpenVPNManagement {
     enum pauseReason {
         noNetwork,
         userPause,
-        screenOff
+        screenOff,
     }
 
-	int mBytecountInterval =2;
+    enum SignaturePadding {
+        RSA_PKCS1_PSS_PADDING,
+        RSA_PKCS1_PADDING,
+        NO_PADDING
+    }
 
-	void reconnect();
+    int mBytecountInterval = 2;
 
-	void pause(pauseReason reason);
+    void reconnect();
 
-	void resume();
+    void pause(pauseReason reason);
 
-	boolean stopVPN();
+    void resume();
+
+    /**
+     * @param replaceConnection True if the VPN is connected by a new connection.
+     * @return true if there was a process that has been send a stop signal
+     */
+    boolean stopVPN(boolean replaceConnection);
 
     /*
      * Rebind the interface
@@ -32,4 +42,10 @@ public interface OpenVPNManagement {
     void networkChange(boolean sameNetwork);
 
     void setPauseCallback(PausedStateCallback callback);
+
+    /**
+     * Send the response to a challenge response
+     * @param response  Base64 encoded response
+     */
+    void sendCRResponse(String response);
 }

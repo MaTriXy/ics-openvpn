@@ -1,17 +1,29 @@
-apply plugin: 'com.android.application'
+/*
+ * Copyright (c) 2012-2017 Arne Schwabe
+ * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
+ */
+
+plugins {
+    alias libs.plugins.android.application
+}
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion '23.0.2'
+    buildFeatures {
+        buildConfig true
+    }
+    compileSdkVersion 33
 
     defaultConfig {
         minSdkVersion 15
-        targetSdkVersion 23
+        targetSdkVersion 33
         versionCode 1
         versionName "1.0"
+    }
+    namespace 'de.blinkt.openvpn.remote'
+    buildFeatures {
+        aidl true
     }
 }
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
 }

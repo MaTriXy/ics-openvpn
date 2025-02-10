@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2012-2017 Arne Schwabe
+ * Distributed under the GNU GPL v2 with additional terms. For full terms see the file doc/LICENSE.txt
+ */
+
 package de.blinkt.openvpn.remote;
 
 import android.app.Activity;
@@ -15,15 +20,20 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.List;
 
@@ -45,6 +55,7 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
         v.findViewById(R.id.getMyIP).setOnClickListener(this);
         v.findViewById(R.id.startembedded).setOnClickListener(this);
         v.findViewById(R.id.addNewProfile).setOnClickListener(this);
+        v.findViewById(R.id.addNewProfileEdit).setOnClickListener(this);
         mHelloWorld = (TextView) v.findViewById(R.id.helloworld);
         mStartVpn = (Button) v.findViewById(R.id.startVPN);
         mStatus = (TextView) v.findViewById(R.id.status);
@@ -61,6 +72,7 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
     private static final int START_PROFILE_BYUUID = 3;
     private static final int ICS_OPENVPN_PERMISSION = 7;
     private static final int PROFILE_ADD_NEW = 8;
+    private static final int PROFILE_ADD_NEW_EDIT = 9;
 
 
     protected IOpenVPNAPIService mService=null;
@@ -69,29 +81,40 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
 
 
 
-    private void startEmbeddedProfile(boolean addNew)
+    private void startEmbeddedProfile(boolean addNew, boolean editable, boolean startAfterAdd)
     {
         try {
-            InputStream conf = getActivity().getAssets().open("test.conf");
-            InputStreamReader isr = new InputStreamReader(conf);
-            BufferedReader br = new BufferedReader(isr);
-            String config="";
+            InputStream conf;
+            /* Try opening test.local.conf first */
+            try {
+                conf = getActivity().getAssets().open("test.local.conf");
+            }
+            catch (IOException e) {
+                conf = getActivity().getAssets().open("test.conf");
+            }
+            BufferedReader br = new BufferedReader(new InputStreamReader(conf));
+            StringBuilder config = new StringBuilder();
             String line;
             while(true) {
                 line = br.readLine();
                 if(line == null)
                     break;
-                config += line + "\n";
+                config.append(line).append("\n");
             }
-            br.readLine();
+            br.close();
+            conf.close();
 
-            if (addNew)
-                mService.addNewVPNProfile("nonEditable", false, config);
-            else
-                mService.startVPN(config);
+            if (addNew) {
+                String name = editable ? "Profile from remote App" : "Non editable profile";
+                APIVpnProfile profile = mService.addNewVPNProfile(name, editable, config.toString());
+                mService.startProfile(profile.mUUID);
+
+            } else
+                mService.startVPN(config.toString());
         } catch (IOException | RemoteException e) {
             e.printStackTrace();
         }
+        Toast.makeText(getActivity(), "Profile started/added", Toast.LENGTH_LONG).show();
     }
 
     @Override
@@ -210,6 +233,10 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
 
     @Override
     public void onClick(View v) {
+        if (mService == null) {
+            Toast.makeText(getActivity(), "No service connection to OpenVPN for Android. App not installed?", Toast.LENGTH_LONG).show();
+            return;
+        }
         switch (v.getId()) {
             case R.id.startVPN:
                 try {
@@ -256,8 +283,10 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
                 break;
 
             case R.id.addNewProfile:
+            case R.id.addNewProfileEdit:
+                int action = (v.getId() == R.id.addNewProfile) ? PROFILE_ADD_NEW : PROFILE_ADD_NEW_EDIT;
                 try {
-                    prepareStartProfile(PROFILE_ADD_NEW);
+                    prepareStartProfile(action);
                 } catch (RemoteException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -281,7 +310,7 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (resultCode == Activity.RESULT_OK) {
             if(requestCode==START_PROFILE_EMBEDDED)
-                startEmbeddedProfile(false);
+                startEmbeddedProfile(false, false, false);
             if(requestCode==START_PROFILE_BYUUID)
                 try {
                     mService.startProfile(mStartUUID);
@@ -297,8 +326,12 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
                 }
 
             }
+            CheckBox startCB = getView().findViewById(R.id.startafterAdding);
             if (requestCode == PROFILE_ADD_NEW) {
-                startEmbeddedProfile(true);
+                startEmbeddedProfile(true, false, startCB.isSelected());
+            }
+            else if (requestCode == PROFILE_ADD_NEW_EDIT) {
+                startEmbeddedProfile(true, true, startCB.isSelected());
             }
         }
     };
@@ -306,22 +339,21 @@ public class MainFragment extends Fragment implements View.OnClickListener, Hand
     String getMyOwnIP() throws UnknownHostException, IOException, RemoteException,
             IllegalArgumentException, IllegalAccessException, InvocationTargetException, NoSuchMethodException
     {
-        String resp="";
-        Socket client = new Socket();
-        // Setting Keep Alive forces creation of the underlying socket, otherwise getFD returns -1
-        client.setKeepAlive(true);
+        StringBuilder resp = new StringBuilder();
 
-
-        client.connect(new InetSocketAddress("v4address.com", 23),20000);
-        client.shutdownOutput();
-        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-        while (true) {
-            String line = in.readLine();
-            if( line == null)
-                return resp;
-            resp+=line;
+        URL url = new URL("https://icanhazip.com");
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
+            while (true) {
+                String line = in.readLine();
+                if( line == null)
+                    return resp.toString();
+                resp.append(line);
+            }
+        } finally {
+            urlConnection.disconnect();
         }
-
     }
 
 

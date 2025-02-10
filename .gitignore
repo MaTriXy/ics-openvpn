@@ -2,6 +2,7 @@ build/
 main/libs/
 main/ovpnlibs/
 main/obj/
+main/.cxx/
 .DS_Store
 .navigation
 google-breakpad/
@@ -20,3 +21,12 @@ cache.properties
 main/openvpn3
 
 
+main/src/ovpn3/java/net/openvpn/ovpn3
+main/.externalNativeBuild
+main/.cxx
+.synopsys
+polaris.yml
+.coverity
+idir
+
+test.local.conf
